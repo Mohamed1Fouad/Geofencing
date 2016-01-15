@@ -1,20 +1,23 @@
 package com.mf.sample.geofencing;
 
+/**
+ * Created by Mohamed1Fouad on 1/15/16.
+ */
 
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
-import android.widget.Button;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
 import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.GeofencingApi;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.model.LatLng;
@@ -23,59 +26,45 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Demonstrates how to create and remove geofences using the GeofencingApi. Uses an IntentService
- * to monitor geofence transitions and creates notifications whenever a device enters or exits
- * a geofence.
- *
- * This sample requires a device's Location settings to be turned on. It also requires
- * the ACCESS_FINE_LOCATION permission, as specified in AndroidManifest.xml.
- *
- * Note that this Activity implements ResultCallback<Status>, requiring that
- * {@code onResult} must be defined. The {@code onResult} runs when the result of calling
- * {@link GeofencingApi#addGeofences(GoogleApiClient, GeofencingRequest, PendingIntent)}  addGeofences()} or
- * {@link com.google.android.gms.location.GeofencingApi#removeGeofences(GoogleApiClient, java.util.List)}  removeGeofences()}
- * becomes available.
- */
+
 public class MainActivity extends ActionBarActivity implements
         ConnectionCallbacks, OnConnectionFailedListener{
 
     protected static final String TAG = "MainActivity";
 
-    /**
-     * Provides the entry point to Google Play services.
-     */
     protected GoogleApiClient mGoogleApiClient;
-
-    /**
-     * The list of geofences used in this sample.
-     */
     protected ArrayList<Geofence> mGeofenceList;
-
-    /**
-     * Used to keep track of whether geofences were added.
-     */
-    private boolean mGeofencesAdded;
-
-    /**
-     * Used when requesting to add or remove geofences.
-     */
     private PendingIntent mGeofencePendingIntent;
 
-    /**
-     * Used to persist application state about whether geofences were added.
-     */
-    private SharedPreferences mSharedPreferences;
+    private LocationManager mLocationManager = null;
+    private static final int LOCATION_INTERVAL = 1000;
+    private static final float LOCATION_DISTANCE = 10f;
 
-    // Buttons for kicking off the process of adding or removing geofences.
-    private Button mAddGeofencesButton;
-    private Button mRemoveGeofencesButton;
+    LocationListener[] mLocationListeners = new LocationListener[] {
+            new LocationListener(LocationManager.GPS_PROVIDER),
+            new LocationListener(LocationManager.NETWORK_PROVIDER)
+    };
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        initializeLocationManager();
+        try {
+            mLocationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
+                    mLocationListeners[1]);
+
+            mLocationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
+                    mLocationListeners[0]);
+        } catch (java.lang.SecurityException ex) {
+            Log.i(TAG, "fail to request location update, ignore", ex);
+        } catch (IllegalArgumentException ex) {
+            Log.d(TAG, "gps provider does not exist " + ex.getMessage());
+        }
 
 
         mGeofenceList = new ArrayList<Geofence>();
@@ -83,7 +72,7 @@ public class MainActivity extends ActionBarActivity implements
         mGeofencePendingIntent = null;
 
         buildGoogleApiClient();
-        populateGeofenceList();
+
 
 
     }
@@ -114,6 +103,7 @@ public class MainActivity extends ActionBarActivity implements
      */
     @Override
     public void onConnected(Bundle connectionHint) {
+        populateGeofenceList();
         Log.i(TAG, "Connected to GoogleApiClient");
     }
 
@@ -129,19 +119,10 @@ public class MainActivity extends ActionBarActivity implements
 
     }
 
-    /**
-     * Builds and returns a GeofencingRequest. Specifies the list of geofences to be monitored.
-     * Also specifies how the geofence notifications are initially triggered.
-     */
+
     private GeofencingRequest getGeofencingRequest() {
         GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
-
-        // The INITIAL_TRIGGER_ENTER flag indicates that geofencing service should trigger a
-        // GEOFENCE_TRANSITION_ENTER notification when the geofence is added and if the device
-        // is already inside that geofence.
         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
-
-        // Add the geofences to be monitored by geofencing service.
         builder.addGeofences(mGeofenceList);
 
         // Return a GeofencingRequest.
@@ -152,13 +133,11 @@ public class MainActivity extends ActionBarActivity implements
 
 
     private PendingIntent getGeofencePendingIntent() {
-        // Reuse the PendingIntent if we already have it.
+
         if (mGeofencePendingIntent != null) {
             return mGeofencePendingIntent;
         }
         Intent intent = new Intent(this, GeofenceService.class);
-        // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
-        // addGeofences() and removeGeofences().
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
@@ -170,8 +149,8 @@ public class MainActivity extends ActionBarActivity implements
 
          HashMap<String, LatLng> my_geofences = new HashMap<String, LatLng>();
         {
-            my_geofences.put("SFO", new LatLng(30, 30));
-            my_geofences.put("GOOGLE", new LatLng(37.422611,-122.0840577));
+            my_geofences.put("Home", new LatLng(30.1, 30));
+            my_geofences.put("Work", new LatLng(33.5,30));
         }
 
         for (Map.Entry<String, LatLng> entry : my_geofences.entrySet()) {
@@ -197,9 +176,61 @@ public class MainActivity extends ActionBarActivity implements
                             Geofence.GEOFENCE_TRANSITION_EXIT)
                     .build());
         }
+
+        // Start service
+        StartService();
     }
 
+        public void StartService(){
+            try {
+                LocationServices.GeofencingApi.addGeofences(
+                        mGoogleApiClient,
+                        // The GeofenceRequest object.
+                        getGeofencingRequest(),
+                        getGeofencePendingIntent()) ;
+            } catch (SecurityException securityException) {
+                securityException.printStackTrace();
+
+            }
+        }
+
+    public class LocationListener implements android.location.LocationListener {
+        Location mLastLocation;
+
+        public LocationListener(String provider) {
+            Log.i(TAG, "LocationListener " + provider);
+            mLastLocation = new Location(provider);
+        }
+
+        @Override
+        public void onLocationChanged(Location location) {
+            Log.i(TAG, "onLocationChanged: " + location);
+            mLastLocation.set(location);
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {
+            Log.i(TAG, "onProviderDisabled: " + provider);
+        }
+
+        @Override
+        public void onProviderEnabled(String provider) {
+            Log.i(TAG, "onProviderEnabled: " + provider);
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            Log.i(TAG, "onStatusChanged: " + provider);
 
 
+        }
+    }
+
+    private void initializeLocationManager() {
+        Log.i(TAG, "initializeLocationManager");
+        if (mLocationManager == null) {
+            mLocationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        }
+    }
 
 }

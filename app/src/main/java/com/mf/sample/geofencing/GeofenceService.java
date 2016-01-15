@@ -3,6 +3,7 @@ package com.mf.sample.geofencing;
 /**
  * Created by Mohamed1Fouad on 1/15/16.
  */
+
 import android.app.IntentService;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -28,13 +29,14 @@ public class GeofenceService extends IntentService {
 
 
     public GeofenceService() {
-
         super(TAG);
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
+
+
     }
 
 
@@ -51,10 +53,9 @@ public class GeofenceService extends IntentService {
         int geofenceTransition = geofencingEvent.getGeofenceTransition();
 
 
-        if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ||
-                geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
+        if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
 
-
+            // When Enter geofence
             List<Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
             String geofenceTransitionDetails = getGeofenceTransitionDetails(
                     this,
@@ -64,6 +65,10 @@ public class GeofenceService extends IntentService {
 
             sendNotification(geofenceTransitionDetails);
             Log.i(TAG, geofenceTransitionDetails);
+        }
+
+        else if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT){
+            // When Exit geofence
         }
     }
 
@@ -122,4 +127,7 @@ public class GeofenceService extends IntentService {
                 return "Unknown";
         }
     }
+
+
+
 }
